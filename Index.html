@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4inarow by Blaise - Multiplayer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 8px;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 8px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #28a745, #ffc107);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 5px;
+        }
+
+        .credit {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .credit a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .credit a:hover {
+            text-decoration: underline;
+        }
+
+        .connection-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .connection-status {
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .status-waiting {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+        }
+
+        .status-connected {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-disconnected {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .connection-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .input-group-custom {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .input-custom {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .btn-connection {
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .btn-create {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-join {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+        }
+
+        .btn-copy {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: white;
+        }
+
+        .btn-connection:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn-connection:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .player-info {
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .player-card {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .player-green {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .player-yellow {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: white;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .scoreboard {
+            background: white;
+            border-radius: 15px;
+            padding: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .team-score {
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .team-a {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .team-b {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: white;
+        }
+
+        .active-team {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            animation: glow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+            50% { box-shadow: 0 5px 30px rgba(255,255,255,0.5); }
+        }
+
+        .board-wrapper {
+            background: linear-gradient(135deg, #2c5aa0, #1e3a8a);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        .timer-display {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #92400e;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .timer-warning {
+            background: linear-gradient(135deg, #fecaca, #fca5a5);
+            animation: timerPulse 1s ease-in-out infinite;
+            color: #991b1b;
+        }
+
+        @keyframes timerPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .column-indicators {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            margin-bottom: 8px;
+            padding: 0 5px;
+        }
+
+        .column-btn {
+            background: rgba(255,255,255,0.2);
+            border: 3px solid transparent;
+            border-radius: 8px;
+            padding: 10px 5px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+            color: white;
+            font-weight: bold;
+            touch-action: manipulation;
+        }
+
+        .column-btn:hover:not(.disabled) {
+            background: rgba(255,255,255,0.4);
+            transform: translateY(-3px);
+            border-color: white;
+        }
+
+        .column-btn:active:not(.disabled) {
+            transform: translateY(-1px);
+        }
+
+        .column-btn.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 6px;
+            background: #1e40af;
+            padding: 10px;
+            border-radius: 10px;
+            aspect-ratio: 7/6;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            background: white;
+            border-radius: 50%;
+            box-shadow: inset 0 3px 8px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cell.green {
+            background: radial-gradient(circle at 30% 30%, #4ade80, #16a34a);
+            box-shadow: 0 5px 15px rgba(34, 197, 94, 0.5);
+            animation: drop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .cell.yellow {
+            background: radial-gradient(circle at 30% 30%, #fbbf24, #f59e0b);
+            box-shadow: 0 5px 15px rgba(245, 158, 11, 0.5);
+            animation: drop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .cell.winner {
+            animation: pulseWin 0.8s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        @keyframes drop {
+            0% {
+                transform: translateY(-400px) scale(0.5);
+                opacity: 0;
+            }
+            70% {
+                transform: translateY(10px) scale(1.1);
+            }
+            85% {
+                transform: translateY(-5px) scale(0.95);
+            }
+            100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulseWin {
+            0%, 100% {
+                transform: scale(1);
+                filter: brightness(1);
+            }
+            50% {
+                transform: scale(1.2);
+                filter: brightness(1.5);
+            }
+        }
+
+        .controls {
+            margin-top: 12px;
+            text-align: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .btn-custom {
+            padding: 8px 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: all 0.3s;
+            border: none;
+            font-size: 0.85rem;
+            touch-action: manipulation;
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-reset:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(239, 68, 68, 0.5);
+        }
+
+        .btn-scores {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+        }
+
+        .btn-scores:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(139, 92, 246, 0.5);
+        }
+
+        .btn-undo {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-undo:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .btn-timer {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: white;
+        }
+
+        .btn-timer:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(6, 182, 212, 0.5);
+        }
+
+        .btn-custom:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 12px;
+            font-weight: bold;
+            font-size: 1rem;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .win-message {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+            animation: celebrate 0.6s ease-out;
+            font-size: 1.2rem;
+        }
+
+        .draw-message {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            animation: celebrate 0.6s ease-out;
+        }
+
+        @keyframes celebrate {
+            0% {
+                transform: scale(0.8) rotate(-5deg);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.1) rotate(5deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .stats-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .stats-panel h5, .stats-panel h6 {
+            font-size: 1rem;
+        }
+
+        .stat-item {
+            padding: 8px;
+            margin: 6px 0;
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #0369a1;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #075985;
+        }
+
+        .move-history {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        .history-item {
+            padding: 6px;
+            margin: 4px 0;
+            background: #f1f5f9;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+
+        .history-item.team-a-move {
+            border-left: 4px solid #28a745;
+        }
+
+        .history-item.team-b-move {
+            border-left: 4px solid #ffc107;
+        }
+
+        /* Desktop Layout */
+        @media (min-width: 992px) {
+            .game-container {
+                padding: 15px;
+            }
+
+            .logo {
+                font-size: 2rem;
+            }
+
+            .main-content {
+                grid-template-columns: 1fr 2fr 1fr;
+            }
+
+            .scoreboard {
+                order: 1;
+            }
+
+            .board-wrapper {
+                order: 2;
+            }
+
+            .stats-panel {
+                order: 3;
+            }
+
+            .column-btn {
+                padding: 12px 8px;
+                font-size: 1.3rem;
+            }
+
+            .btn-custom {
+                padding: 10px 20px;
+                font-size: 0.95rem;
+            }
+
+            .status-message {
+                font-size: 1.2rem;
+            }
+
+            .timer-display {
+                font-size: 1.3rem;
+                padding: 12px;
+            }
+        }
+
+        /* Tablet */
+        @media (min-width: 768px) and (max-width: 991px) {
+            .logo {
+                font-size: 1.9rem;
+            }
+
+            .input-group-custom {
+                flex-wrap: nowrap;
+            }
+        }
+
+        /* Mobile - Small */
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .game-container {
+                padding: 5px;
+            }
+
+            .header {
+                padding: 10px;
+                margin-bottom: 8px;
+            }
+
+            .logo {
+                font-size: 1.4rem;
+            }
+
+            .credit {
+                font-size: 0.75rem;
+            }
+
+            .connection-panel, .scoreboard, .stats-panel {
+                padding: 10px;
+                margin-bottom: 8px;
+            }
+
+            .column-btn {
+                padding: 8px 3px;
+                font-size: 1rem;
+                border-radius: 6px;
+            }
+
+            .board {
+                gap: 4px;
+                padding: 8px;
+            }
+
+            .controls {
+                gap: 5px;
+            }
+
+            .btn-custom {
+                padding: 7px 12px;
+                font-size: 0.75rem;
+            }
+
+            .btn-connection {
+                padding: 8px 15px;
+                font-size: 0.8rem;
+            }
+
+            .input-custom {
+                font-size: 0.85rem;
+                padding: 8px;
+                min-width: 120px;
+            }
+
+            .status-message {
+                font-size: 0.9rem;
+                padding: 8px;
+            }
+
+            .timer-display {
+                font-size: 1rem;
+                padding: 8px;
+            }
+
+            .team-score {
+                padding: 10px;
+                font-size: 0.85rem;
+            }
+
+            .stat-item {
+                font-size: 0.75rem;
+                padding: 6px;
+            }
+
+            .stat-value {
+                font-size: 1rem;
+            }
+
+            .history-item {
+                font-size: 0.75rem;
+            }
+
+            .move-history {
+                max-height: 150px;
+            }
+        }
+
+        /* Mobile - Extra Small */
+        @media (max-width: 360px) {
+            .logo {
+                font-size: 1.2rem;
+            }
+
+            .column-btn {
+                padding: 6px 2px;
+                font-size: 0.9rem;
+            }
+
+            .btn-custom {
+                padding: 6px 10px;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Landscape Mobile */
+        @media (max-height: 600px) and (orientation: landscape) {
+            .board {
+                max-width: 500px;
+            }
+
+            .move-history {
+                max-height: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="logo">🎮 4inarow</div>
+            <div class="credit">
+                Created by <a href="https://michealblaisee.netlify.app" target="_blank">Blaise</a>
+            </div>
+            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Online Multiplayer Challenge</p>
+        </div>
+
+        <div class="connection-panel">
+            <div class="connection-status" id="connectionStatus">
+                🔴 Not Connected
+            </div>
+
+            <div class="connection-controls" id="connectionControls">
+                <div class="input-group-custom">
+                    <button class="btn-connection btn-create" onclick="createGame()">
+                        🎮 Create Game
+                    </button>
+                    <button class="btn-connection btn-join" onclick="showJoinInput()">
+                        🔗 Join Game
+                    </button>
+                </div>
+
+                <div class="input-group-custom" id="joinInput" style="display: none;">
+                    <input type="text" class="input-custom" id="joinId" placeholder="Enter Game ID">
+                    <button class="btn-connection btn-join" onclick="joinGame()">
+                        Join
+                    </button>
+                </div>
+
+                <div class="input-group-custom" id="roomIdDisplay" style="display: none;">
+                    <input type="text" class="input-custom" id="roomId" readonly>
+                    <button class="btn-connection btn-copy" onclick="copyRoomId()">
+                        📋 Copy ID
+                    </button>
+                </div>
+            </div>
+
+            <div class="player-info" id="playerInfo" style="display: none;">
+                <div class="player-card player-green">
+                    <div id="player1Name">Player 1 (You)</div>
+                </div>
+                <div class="player-card player-yellow">
+                    <div id="player2Name">Waiting...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="scoreboard">
+                <h5 class="text-center mb-2">Scoreboard</h5>
+                <div class="row g-2">
+                    <div class="col-12">
+                        <div class="team-score team-a" id="teamAScore">
+                            <div>🟢 Player 1</div>
+                            <div class="fs-3" id="scoreA">0</div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="team-score team-b" id="teamBScore">
+                            <div>🟡 Player 2</div>
+                            <div class="fs-3" id="scoreB">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="board-wrapper">
+                <div class="timer-display" id="timerDisplay">
+                    ⏱️ Time: 30s
+                </div>
+                
+                <div class="column-indicators" id="columnIndicators"></div>
+                <div class="board" id="board"></div>
+                
+                <div class="controls">
+                    <button class="btn btn-custom btn-reset" onclick="resetGame()">
+                        🔄 New Game
+                    </button>
+                    <button class="btn btn-custom btn-undo" id="undoBtn" onclick="undoMove()">
+                        ↩️ Undo
+                    </button>
+                    <button class="btn btn-custom btn-timer" id="timerBtn" onclick="toggleTimer()">
+                        ⏱️ Timer: ON
+                    </button>
+                    <button class="btn btn-custom btn-scores" onclick="resetScores()">
+                        📊 Reset Scores
+                    </button>
+                </div>
+
+                <div class="status-message" id="status">
+                    Connect to start playing
+                </div>
+            </div>
+
+            <div class="stats-panel">
+                <h5 class="text-center mb-2">Game Stats</h5>
+                
+                <div class="stat-item">
+                    <span class="stat-label">Total Games</span>
+                    <span class="stat-value" id="totalGames">0</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">Current Moves</span>
+                    <span class="stat-value" id="moveCount">0</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">Win Rate P1</span>
+                    <span class="stat-value" id="winRateA">0%</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">Win Rate P2</span>
+                    <span class="stat-value" id="winRateB">0%</span>
+                </div>
+
+                <h6 class="text-center mt-2 mb-2">Move History</h6>
+                <div class="move-history" id="moveHistory">
+                    <p class="text-center text-muted" style="font-size: 0.85rem;">No moves yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 6;
+        const COLS = 7;
+        const TURN_TIME = 30;
+        
+        // Game State
+        let board = [];
+        let currentPlayer = 'A';
+        let gameActive = false;
+        let scores = { A: 0, B: 0 };
+        let animating = false;
+        let moveHistory = [];
+        let boardHistory = [];
+        let totalGames = 0;
+        let currentMoves = 0;
+        let timerEnabled = true;
+        let timeRemaining = TURN_TIME;
+        let timerInterval = null;
+
+        // Multiplayer State
+        let peer = null;
+        let connection = null;
+        let myPeerId = null;
+        let isHost = false;
+        let myPlayer = null; // 'A' or 'B'
+        let opponentConnected = false;
+
+        // Initialize PeerJS
+        function initPeer() {
+            peer = new Peer();
+            
+            peer.on('open', (id) => {
+                myPeerId = id;
+                console.log('My peer ID:', id);
+            });
+
+            peer.on('connection', (conn) => {
+                connection = conn;
+                setupConnection();
+                opponentConnected = true;
+                updateConnectionStatus('connected');
+                document.getElementById('player2Name').textContent = 'Player 2 (Opponent)';
+                
+                // Host is always Player 1 (Green/A)
+                myPlayer = 'A';
+                gameActive = true;
+                initBoard();
+                updateStatus();
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                alert('Connection error: ' + err.type);
+            });
+        }
+
+        function createGame() {
+            if (!peer || !myPeerId) {
+                alert('Please wait, initializing connection...');
+                return;
+            }
+
+            isHost = true;
+            myPlayer = 'A';
+            
+            document.getElementById('roomId').value = myPeerId;
+            document.getElementById('roomIdDisplay').style.display = 'flex';
+            document.getElementById('connectionControls').querySelector('.input-group-custom').style.display = 'none';
+            document.getElementById('playerInfo').style.display = 'flex';
+            document.getElementById('player1Name').textContent = 'Player 1 (You)';
+            
+            updateConnectionStatus('waiting');
+            initBoard();
+        }
+
+        function showJoinInput() {
+            document.getElementById('joinInput').style.display = 'flex';
+        }
+
+        function joinGame() {
+            const roomId = document.getElementById('joinId').value.trim();
+            
+            if (!roomId) {
+                alert('Please enter a Game ID');
+                return;
+            }
+
+            if (!peer) {
+                alert('Please wait, initializing connection...');
+                return;
+            }
+
+            isHost = false;
+            myPlayer = 'B';
+            
+            connection = peer.connect(roomId);
+            setupConnection();
+
+            document.getElementById('connectionControls').style.display = 'none';
+            document.getElementById('playerInfo').style.display = 'flex';
+            document.getElementById('player1Name').textContent = 'Player 1 (Opponent)';
+            document.getElementById('player2Name').textContent = 'Player 2 (You)';
+            
+            connection.on('open', () => {
+                opponentConnected = true;
+                updateConnectionStatus('connected');
+                gameActive = true;
+                initBoard();
+                
+                // Request current game state from host
+                sendMessage({ type: 'requestState' });
+            });
+        }
+
+        function setupConnection() {
+            connection.on('data', (data) => {
+                handleMessage(data);
+            });
+
+            connection.on('close', () => {
+                opponentConnected = false;
+                gameActive = false;
+                updateConnectionStatus('disconnected');
+                alert('Opponent disconnected');
+            });
+
+            connection.on('error', (err) => {
+                console.error('Connection error:', err);
+            });
+        }
+
+        function sendMessage(message) {
+            if (connection && connection.open) {
+                connection.send(message);
+            }
+        }
+
+        function handleMessage(data) {
+            switch(data.type) {
+                case 'move':
+                    receiveMove(data.row, data.col);
+                    break;
+                case 'reset':
+                    initBoard();
+                    break;
+                case 'undo':
+                    undoMove();
+                    break;
+                case 'requestState':
+                    if (isHost) {
+                        sendMessage({
+                            type: 'gameState',
+                            board: board,
+                            currentPlayer: currentPlayer,
+                            scores: scores,
+                            totalGames: totalGames
+                        });
+                    }
+                    break;
+                case 'gameState':
+                    board = data.board;
+                    currentPlayer = data.currentPlayer;
+                    scores = data.scores;
+                    totalGames = data.totalGames;
+                    renderBoardFromState();
+                    updateScoreDisplay();
+                    updateStats();
+                    updateStatus();
+                    updateActiveTeam();
+                    break;
+            }
+        }
+
+        function receiveMove(row, col) {
+            if (animating) return;
+            
+            animating = true;
+            board[row][col] = currentPlayer;
+            
+            moveHistory.push({
+                player: currentPlayer,
+                row: row,
+                col: col,
+                move: currentMoves + 1
+            });
+            
+            currentMoves++;
+            
+            const cell = document.getElementById(`cell-${row}-${col}`);
+            const colorClass = currentPlayer === 'A' ? 'green' : 'yellow';
+            cell.classList.add(colorClass);
+            
+            setTimeout(() => {
+                animating = false;
+                checkGameState(row, col);
+            }, 500);
+            
+            updateColumnButtons();
+            updateMoveHistory();
+            updateStats();
+            updateUndoButton();
+        }
+
+        function copyRoomId() {
+            const roomIdInput = document.getElementById('roomId');
+            roomIdInput.select();
+            roomIdInput.setSelectionRange(0, 99999);
+            
+            navigator.clipboard.writeText(roomIdInput.value).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(() => {
+                alert('Room ID: ' + roomIdInput.value);
+            });
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            
+            switch(status) {
+                case 'waiting':
+                    statusEl.className = 'connection-status status-waiting';
+                    statusEl.textContent = '⏳ Waiting for opponent...';
+                    break;
+                case 'connected':
+                    statusEl.className = 'connection-status status-connected';
+                    statusEl.textContent = '✅ Connected - Game Ready!';
+                    break;
+                case 'disconnected':
+                    statusEl.className = 'connection-status status-disconnected';
+                    statusEl.textContent = '🔴 Disconnected';
+                    break;
+                default:
+                    statusEl.className = 'connection-status';
+                    statusEl.textContent = '🔴 Not Connected';
+            }
+        }
+
+        function initBoard() {
+            board = [];
+            for (let r = 0; r < ROWS; r++) {
+                board[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    board[r][c] = null;
+                }
+            }
+            
+            moveHistory = [];
+            boardHistory = [];
+            currentMoves = 0;
+            
+            renderBoard();
+            renderColumnButtons();
+            
+            if (opponentConnected) {
+                gameActive = true;
+            }
+            currentPlayer = 'A';
+            animating = false;
+            updateStatus();
+            updateActiveTeam();
+            updateMoveHistory();
+            updateStats();
+            updateUndoButton();
+            resetTimer();
+        }
+
+        function renderBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${row}-${col}`;
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function renderColumnButtons() {
+            const indicators = document.getElementById('columnIndicators');
+            indicators.innerHTML = '';
+            
+            for (let col = 0; col < COLS; col++) {
+                const btn = document.createElement('button');
+                btn.className = 'column-btn';
+                btn.textContent = '↓';
+                btn.onclick = () => handleColumnClick(col);
+                btn.id = `col-btn-${col}`;
+                indicators.appendChild(btn);
+            }
+        }
+
+        function handleColumnClick(col) {
+            if (!gameActive || animating) return;
+            if (!opponentConnected) {
+                alert('Waiting for opponent to connect!');
+                return;
+            }
+            if (currentPlayer !== myPlayer) {
+                alert("It's not your turn!");
+                return;
+            }
+            
+            const row = findAvailableRow(col);
+            if (row === -1) return;
+            
+            animating = true;
+            boardHistory.push(JSON.parse(JSON.stringify(board)));
+            
+            sendMessage({
+                type: 'move',
+                row: row,
+                col: col
+            });
+            
+            dropPiece(row, col);
+        }
+
+        function findAvailableRow(col) {
+            for (let row = ROWS - 1; row >= 0; row--) {
+                if (board[row][col] === null) {
+                    return row;
+                }
+            }
+            return -1;
+        }
+
+        function dropPiece(row, col) {
+            board[row][col] = currentPlayer;
+            
+            moveHistory.push({
+                player: currentPlayer,
+                row: row,
+                col: col,
+                move: currentMoves + 1
+            });
+            
+            currentMoves++;
+            
+            const cell = document.getElementById(`cell-${row}-${col}`);
+            const colorClass = currentPlayer === 'A' ? 'green' : 'yellow';
+            cell.classList.add(colorClass);
+            
+            setTimeout(() => {
+                animating = false;
+                checkGameState(row, col);
+            }, 500);
+            
+            updateColumnButtons();
+            updateMoveHistory();
+            updateStats();
+            updateUndoButton();
+        }
+
+        function undoMove() {
+            if (moveHistory.length === 0 || !gameActive || animating) return;
+            if (!opponentConnected) return;
+            
+            const lastMove = moveHistory.pop();
+            const lastBoard = boardHistory.pop();
+            
+            if (lastBoard) {
+                board = JSON.parse(JSON.stringify(lastBoard));
+                currentMoves--;
+                
+                renderBoardFromState();
+                
+                currentPlayer = lastMove.player;
+                updateStatus();
+                updateActiveTeam();
+                updateColumnButtons();
+                updateMoveHistory();
+                updateStats();
+                updateUndoButton();
+                resetTimer();
+                
+                sendMessage({ type: 'undo' });
+            }
+        }
+
+        function renderBoardFromState() {
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const cell = document.getElementById(`cell-${row}-${col}`);
+                    cell.className = 'cell';
+                    
+                    if (board[row][col] === 'A') {
+                        cell.classList.add('green');
+                    } else if (board[row][col] === 'B') {
+                        cell.classList.add('yellow');
+                    }
+                }
+            }
+        }
+
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undoBtn');
+            undoBtn.disabled = moveHistory.length === 0 || !gameActive || !opponentConnected;
+        }
+
+        function updateMoveHistory() {
+            const historyEl = document.getElementById('moveHistory');
+            
+            if (moveHistory.length === 0) {
+                historyEl.innerHTML = '<p class="text-center text-muted" style="font-size: 0.85rem;">No moves yet</p>';
+                return;
+            }
+            
+            const recentMoves = moveHistory.slice(-8).reverse();
+            
+            historyEl.innerHTML = recentMoves.map(move => {
+                const teamClass = move.player === 'A' ? 'team-a-move' : 'team-b-move';
+                const emoji = move.player === 'A' ? '🟢' : '🟡';
+                return `
+                    <div class="history-item ${teamClass}">
+                        <span>${emoji} Player ${move.player === 'A' ? '1' : '2'}</span>
+                        <span>Col ${move.col + 1}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateStats() {
+            document.getElementById('totalGames').textContent = totalGames;
+            document.getElementById('moveCount').textContent = currentMoves;
+            
+            const winRateA = totalGames > 0 ? ((scores.A / totalGames) * 100).toFixed(1) : 0;
+            const winRateB = totalGames > 0 ? ((scores.B / totalGames) * 100).toFixed(1) : 0;
+            
+            document.getElementById('winRateA').textContent = winRateA + '%';
+            document.getElementById('winRateB').textContent = winRateB + '%';
+        }
+
+        function resetTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            timeRemaining = TURN_TIME;
+            updateTimerDisplay();
+            
+            if (timerEnabled && gameActive) {
+                timerInterval = setInterval(() => {
+                    timeRemaining--;
+                    updateTimerDisplay();
+                    
+                    if (timeRemaining <= 0) {
+                        handleTimeOut();
+                    }
+                }, 1000);
+            }
+        }
+
+        function updateTimerDisplay() {
+            const timerEl = document.getElementById('timerDisplay');
+            timerEl.textContent = `⏱️ Time: ${timeRemaining}s`;
+            
+            if (timeRemaining <= 10 && timerEnabled) {
+                timerEl.classList.add('timer-warning');
+            } else {
+                timerEl.classList.remove('timer-warning');
+            }
+            
+            if (!timerEnabled) {
+                timerEl.textContent = '⏱️ Timer: OFF';
+                timerEl.classList.remove('timer-warning');
+            }
+        }
+
+        function handleTimeOut() {
+            if (!gameActive) return;
+            
+            clearInterval(timerInterval);
+            
+            currentPlayer = currentPlayer === 'A' ? 'B' : 'A';
+            updateStatus();
+            updateActiveTeam();
+            resetTimer();
+        }
+
+        function toggleTimer() {
+            timerEnabled = !timerEnabled;
+            const timerBtn = document.getElementById('timerBtn');
+            timerBtn.textContent = timerEnabled ? '⏱️ Timer: ON' : '⏱️ Timer: OFF';
+            resetTimer();
+        }
+
+        function updateColumnButtons() {
+            for (let col = 0; col < COLS; col++) {
+                const btn = document.getElementById(`col-btn-${col}`);
+                const available = findAvailableRow(col) !== -1;
+                
+                if (available && gameActive && opponentConnected) {
+                    btn.classList.remove('disabled');
+                } else {
+                    btn.classList.add('disabled');
+                }
+            }
+        }
+
+        function checkGameState(row, col) {
+            const winResult = checkWin(row, col);
+            
+            if (winResult) {
+                gameActive = false;
+                highlightWinningCells(winResult);
+                scores[currentPlayer]++;
+                totalGames++;
+                updateScoreDisplay();
+                updateStats();
+                showWinner();
+                updateColumnButtons();
+                clearInterval(timerInterval);
+                return;
+            }
+            
+            if (checkDraw()) {
+                gameActive = false;
+                totalGames++;
+                updateStats();
+                showDraw();
+                updateColumnButtons();
+                clearInterval(timerInterval);
+                return;
+            }
+            
+            currentPlayer = currentPlayer === 'A' ? 'B' : 'A';
+            updateStatus();
+            updateActiveTeam();
+            resetTimer();
+        }
+
+        function checkWin(row, col) {
+            const player = board[row][col];
+            const directions = [
+                { dr: 0, dc: 1 },
+                { dr: 1, dc: 0 },
+                { dr: 1, dc: 1 },
+                { dr: 1, dc: -1 }
+            ];
+            
+            for (let d = 0; d < directions.length; d++) {
+                const dir = directions[d];
+                const cells = [[row, col]];
+                
+                let r = row + dir.dr;
+                let c = col + dir.dc;
+                while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+                    cells.push([r, c]);
+                    r += dir.dr;
+                    c += dir.dc;
+                }
+                
+                r = row - dir.dr;
+                c = col - dir.dc;
+                while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+                    cells.push([r, c]);
+                    r -= dir.dr;
+                    c -= dir.dc;
+                }
+                
+                if (cells.length >= 4) {
+                    return cells;
+                }
+            }
+            
+            return null;
+        }
+
+        function highlightWinningCells(cells) {
+            for (let i = 0; i < cells.length; i++) {
+                const cellCoords = cells[i];
+                const r = cellCoords[0];
+                const c = cellCoords[1];
+                const cell = document.getElementById(`cell-${r}-${c}`);
+                if (cell) {
+                    cell.classList.add('winner');
+                }
+            }
+        }
+
+        function checkDraw() {
+            for (let c = 0; c < COLS; c++) {
+                if (board[0][c] === null) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function showWinner() {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status-message win-message';
+            const playerNum = currentPlayer === 'A' ? '1' : '2';
+            const emoji = currentPlayer === 'A' ? '🟢' : '🟡';
+            
+            if (currentPlayer === myPlayer) {
+                statusEl.textContent = `🎉 ${emoji} You WIN! 🎉`;
+            } else {
+                statusEl.textContent = `${emoji} Player ${playerNum} WINS!`;
+            }
+        }
+
+        function showDraw() {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status-message draw-message';
+            statusEl.textContent = "🤝 It's a Draw! 🤝";
+        }
+
+        function updateStatus() {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status-message';
+            
+            if (!opponentConnected) {
+                statusEl.textContent = 'Waiting for opponent...';
+                return;
+            }
+            
+            const playerNum = currentPlayer === 'A' ? '1' : '2';
+            const emoji = currentPlayer === 'A' ? '🟢' : '🟡';
+            
+            if (currentPlayer === myPlayer) {
+                statusEl.textContent = `${emoji} Your Turn`;
+            } else {
+                statusEl.textContent = `${emoji} Player ${playerNum}'s Turn`;
+            }
+        }
+
+        function updateActiveTeam() {
+            const teamAEl = document.getElementById('teamAScore');
+            const teamBEl = document.getElementById('teamBScore');
+            
+            if (currentPlayer === 'A') {
+                teamAEl.classList.add('active-team');
+                teamBEl.classList.remove('active-team');
+            } else {
+                teamBEl.classList.add('active-team');
+                teamAEl.classList.remove('active-team');
+            }
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('scoreA').textContent = scores.A;
+            document.getElementById('scoreB').textContent = scores.B;
+        }
+
+        function resetGame() {
+            if (!opponentConnected) {
+                initBoard();
+                return;
+            }
+            
+            if (confirm('Start a new game?')) {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                }
+                
+                sendMessage({ type: 'reset' });
+                initBoard();
+                gameActive = true;
+            }
+        }
+
+        function resetScores() {
+            if (confirm('Reset all scores? This cannot be undone!')) {
+                scores = { A: 0, B: 0 };
+                totalGames = 0;
+                updateScoreDisplay();
+                updateStats();
+                resetGame();
+            }
+        }
+
+        // Initialize on page load
+        initPeer();
+        initBoard();
+    </script>
+</body>
+</html>
