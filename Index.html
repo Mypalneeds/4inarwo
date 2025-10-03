@@ -844,6 +844,7 @@
         let isHost = false;
         let myPlayer = null;
         let opponentConnected = false;
+        let connectionEstablished = false;
 
         function initPeer() {
             peer = new Peer({
@@ -877,21 +878,58 @@
             });
 
             peer.on('connection', (conn) => {
+                if (connectionEstablished) {
+                    console.log('Already connected, ignoring new connection');
+                    return;
+                }
+                
                 connection = conn;
                 setupConnection();
-                opponentConnected = true;
-                updateConnectionStatus('connected');
-                document.getElementById('player2Name').textContent = 'Player 2 (Opponent)';
                 
-                myPlayer = 'A';
-                gameActive = true;
-                initBoard();
-                updateStatus();
+                conn.on('open', () => {
+                    connectionEstablished = true;
+                    opponentConnected = true;
+                    
+                    sendMessage({ 
+                        type: 'handshake', 
+                        player: 'B'
+                    });
+                    
+                    sendMessage({
+                        type: 'gameState',
+                        board: board,
+                        currentPlayer: currentPlayer,
+                        scores: scores,
+                        totalGames: totalGames,
+                        moveHistory: moveHistory,
+                        boardHistory: boardHistory,
+                        currentMoves: currentMoves
+                    });
+                    
+                    updateConnectionStatus('connected');
+                    document.getElementById('player2Name').textContent = 'Player 2 (Opponent)';
+                    
+                    myPlayer = 'A';
+                    gameActive = true;
+                    updateStatus();
+                    updateColumnButtons();
+                });
             });
 
             peer.on('error', (err) => {
                 console.error('Peer error:', err);
-                alert('Connection error: ' + err.type);
+                if (err.type === 'peer-unavailable') {
+                    alert('Game ID not found. Please check the ID and try again.');
+                } else {
+                    alert('Connection error: ' + err.type);
+                }
+                connectionEstablished = false;
+                opponentConnected = false;
+            });
+
+            peer.on('disconnected', () => {
+                console.log('Peer disconnected, attempting to reconnect...');
+                peer.reconnect();
             });
         }
 
@@ -931,10 +969,20 @@
                 return;
             }
 
+            if (connectionEstablished) {
+                alert('Already connected to a game');
+                return;
+            }
+
             isHost = false;
             myPlayer = 'B';
             
-            connection = peer.connect(roomId);
+            updateConnectionStatus('waiting');
+            
+            connection = peer.connect(roomId, {
+                reliable: true
+            });
+            
             setupConnection();
 
             document.getElementById('connectionControls').style.display = 'none';
@@ -943,12 +991,25 @@
             document.getElementById('player2Name').textContent = 'Player 2 (You)';
             
             connection.on('open', () => {
+                console.log('Connection opened to host');
+                connectionEstablished = true;
                 opponentConnected = true;
-                updateConnectionStatus('connected');
-                gameActive = true;
-                initBoard();
                 
-                sendMessage({ type: 'requestState' });
+                sendMessage({ 
+                    type: 'handshake', 
+                    player: 'B'
+                });
+                
+                setTimeout(() => {
+                    sendMessage({ type: 'requestState' });
+                }, 100);
+            });
+
+            connection.on('error', (err) => {
+                console.error('Connection error:', err);
+                connectionEstablished = false;
+                opponentConnected = false;
+                updateConnectionStatus('disconnected');
             });
         }
 
@@ -958,6 +1019,8 @@
             });
 
             connection.on('close', () => {
+                console.log('Connection closed');
+                connectionEstablished = false;
                 opponentConnected = false;
                 gameActive = false;
                 updateConnectionStatus('disconnected');
@@ -971,21 +1034,45 @@
 
         function sendMessage(message) {
             if (connection && connection.open) {
-                connection.send(message);
+                try {
+                    connection.send(message);
+                    return true;
+                } catch (err) {
+                    console.error('Failed to send message:', err);
+                    return false;
+                }
             }
+            return false;
         }
 
         function handleMessage(data) {
+            console.log('Received message:', data.type);
+            
             switch(data.type) {
+                case 'handshake':
+                    if (isHost && data.player === 'B') {
+                        updateConnectionStatus('connected');
+                        opponentConnected = true;
+                        gameActive = true;
+                        document.getElementById('player2Name').textContent = 'Player 2 (Opponent)';
+                        updateStatus();
+                        updateColumnButtons();
+                    }
+                    break;
+                    
                 case 'move':
                     receiveMove(data.row, data.col);
                     break;
+                    
                 case 'reset':
                     initBoard();
+                    gameActive = true;
                     break;
+                    
                 case 'undo':
-                    undoMove();
+                    performUndo();
                     break;
+                    
                 case 'requestState':
                     if (isHost) {
                         sendMessage({
@@ -993,20 +1080,50 @@
                             board: board,
                             currentPlayer: currentPlayer,
                             scores: scores,
-                            totalGames: totalGames
+                            totalGames: totalGames,
+                            moveHistory: moveHistory,
+                            boardHistory: boardHistory,
+                            currentMoves: currentMoves
                         });
                     }
                     break;
+                    
                 case 'gameState':
                     board = data.board;
                     currentPlayer = data.currentPlayer;
                     scores = data.scores;
                     totalGames = data.totalGames;
+                    moveHistory = data.moveHistory || [];
+                    boardHistory = data.boardHistory || [];
+                    currentMoves = data.currentMoves || 0;
+                    
                     renderBoardFromState();
                     updateScoreDisplay();
                     updateStats();
                     updateStatus();
                     updateActiveTeam();
+                    updateColumnButtons();
+                    updateMoveHistory();
+                    updateUndoButton();
+                    
+                    if (!gameActive) {
+                        gameActive = true;
+                    }
+                    
+                    updateConnectionStatus('connected');
+                    break;
+                    
+                case 'timerToggle':
+                    timerEnabled = data.enabled;
+                    document.getElementById('timerBtn').textContent = timerEnabled ? '⏱️ Timer: ON' : '⏱️ Timer: OFF';
+                    resetTimer();
+                    break;
+                    
+                case 'scoresReset':
+                    scores = { A: 0, B: 0 };
+                    totalGames = 0;
+                    updateScoreDisplay();
+                    updateStats();
                     break;
             }
         }
@@ -1154,11 +1271,16 @@
             animating = true;
             boardHistory.push(JSON.parse(JSON.stringify(board)));
             
-            sendMessage({
+            if (!sendMessage({
                 type: 'move',
                 row: row,
                 col: col
-            });
+            })) {
+                animating = false;
+                boardHistory.pop();
+                alert('Failed to send move. Connection may be lost.');
+                return;
+            }
             
             dropPiece(row, col);
         }
@@ -1203,6 +1325,17 @@
             if (moveHistory.length === 0 || !gameActive || animating) return;
             if (!opponentConnected) return;
             
+            if (!sendMessage({ type: 'undo' })) {
+                alert('Failed to send undo. Connection may be lost.');
+                return;
+            }
+            
+            performUndo();
+        }
+
+        function performUndo() {
+            if (moveHistory.length === 0) return;
+            
             const lastMove = moveHistory.pop();
             const lastBoard = boardHistory.pop();
             
@@ -1221,7 +1354,9 @@
                 updateUndoButton();
                 resetTimer();
                 
-                sendMessage({ type: 'undo' });
+                if (!gameActive) {
+                    gameActive = true;
+                }
             }
         }
 
@@ -1329,6 +1464,12 @@
             timerEnabled = !timerEnabled;
             const timerBtn = document.getElementById('timerBtn');
             timerBtn.textContent = timerEnabled ? '⏱️ Timer: ON' : '⏱️ Timer: OFF';
+            
+            sendMessage({
+                type: 'timerToggle',
+                enabled: timerEnabled
+            });
+            
             resetTimer();
         }
 
@@ -1337,7 +1478,7 @@
                 const btn = document.getElementById(`col-btn-${col}`);
                 const available = findAvailableRow(col) !== -1;
                 
-                if (available && gameActive && opponentConnected) {
+                if (available && gameActive && opponentConnected && currentPlayer === myPlayer) {
                     btn.classList.remove('disabled');
                 } else {
                     btn.classList.add('disabled');
@@ -1512,6 +1653,11 @@
             if (confirm('Reset all scores? This cannot be undone!')) {
                 scores = { A: 0, B: 0 };
                 totalGames = 0;
+                
+                sendMessage({ 
+                    type: 'scoresReset'
+                });
+                
                 updateScoreDisplay();
                 updateStats();
                 resetGame();
