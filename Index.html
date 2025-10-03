@@ -78,6 +78,17 @@
             margin-bottom: 10px;
         }
 
+        .status-initializing {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .status-ready {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
         .status-waiting {
             background: linear-gradient(135deg, #fbbf24, #f59e0b);
             color: white;
@@ -146,7 +157,7 @@
             color: white;
         }
 
-        .btn-connection:hover {
+        .btn-connection:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
@@ -376,6 +387,7 @@
             border: none;
             font-size: 0.85rem;
             touch-action: manipulation;
+            cursor: pointer;
         }
 
         .btn-reset {
@@ -517,6 +529,21 @@
 
         .history-item.team-b-move {
             border-left: 4px solid #ffc107;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         @media (min-width: 992px) {
@@ -664,38 +691,12 @@
                 max-height: 150px;
             }
         }
-
-        @media (max-width: 360px) {
-            .logo {
-                font-size: 1.2rem;
-            }
-
-            .column-btn {
-                padding: 6px 2px;
-                font-size: 0.9rem;
-            }
-
-            .btn-custom {
-                padding: 6px 10px;
-                font-size: 0.7rem;
-            }
-        }
-
-        @media (max-height: 600px) and (orientation: landscape) {
-            .board {
-                max-width: 500px;
-            }
-
-            .move-history {
-                max-height: 120px;
-            }
-        }
     </style>
 </head>
 <body>
     <div class="game-container">
         <div class="header">
-            <div class="logo">🎮 4inarow</div>
+            <div class="logo">4inarow</div>
             <div class="credit">
                 Created by <a href="https://michealblaisee.netlify.app" target="_blank">Blaise</a>
             </div>
@@ -703,17 +704,17 @@
         </div>
 
         <div class="connection-panel">
-            <div class="connection-status" id="connectionStatus">
-                🔴 Not Connected
+            <div class="connection-status status-initializing" id="connectionStatus">
+                <span class="loading-spinner"></span>Initializing connection...
             </div>
 
             <div class="connection-controls" id="connectionControls">
                 <div class="input-group-custom">
-                    <button class="btn-connection btn-create" onclick="createGame()">
-                        🎮 Create Game
+                    <button class="btn-connection btn-create" id="createBtn" onclick="createGame()" disabled>
+                        Create Game
                     </button>
-                    <button class="btn-connection btn-join" onclick="showJoinInput()">
-                        🔗 Join Game
+                    <button class="btn-connection btn-join" id="joinBtn" onclick="showJoinInput()" disabled>
+                        Join Game
                     </button>
                 </div>
 
@@ -727,7 +728,7 @@
                 <div class="input-group-custom" id="roomIdDisplay" style="display: none;">
                     <input type="text" class="input-custom" id="roomId" readonly>
                     <button class="btn-connection btn-copy" onclick="copyRoomId()">
-                        📋 Copy ID
+                        Copy ID
                     </button>
                 </div>
             </div>
@@ -748,13 +749,13 @@
                 <div class="row g-2">
                     <div class="col-12">
                         <div class="team-score team-a" id="teamAScore">
-                            <div>🟢 Player 1</div>
+                            <div>Player 1</div>
                             <div class="fs-3" id="scoreA">0</div>
                         </div>
                     </div>
                     <div class="col-12">
                         <div class="team-score team-b" id="teamBScore">
-                            <div>🟡 Player 2</div>
+                            <div>Player 2</div>
                             <div class="fs-3" id="scoreB">0</div>
                         </div>
                     </div>
@@ -763,7 +764,7 @@
 
             <div class="board-wrapper">
                 <div class="timer-display" id="timerDisplay">
-                    ⏱️ Time: 30s
+                    Time: 30s
                 </div>
                 
                 <div class="column-indicators" id="columnIndicators"></div>
@@ -771,21 +772,21 @@
                 
                 <div class="controls">
                     <button class="btn btn-custom btn-reset" onclick="resetGame()">
-                        🔄 New Game
+                        New Game
                     </button>
                     <button class="btn btn-custom btn-undo" id="undoBtn" onclick="undoMove()">
-                        ↩️ Undo
+                        Undo
                     </button>
                     <button class="btn btn-custom btn-timer" id="timerBtn" onclick="toggleTimer()">
-                        ⏱️ Timer: ON
+                        Timer: ON
                     </button>
                     <button class="btn btn-custom btn-scores" onclick="resetScores()">
-                        📊 Reset Scores
+                        Reset Scores
                     </button>
                 </div>
 
                 <div class="status-message" id="status">
-                    Connect to start playing
+                    Initializing connection...
                 </div>
             </div>
 
@@ -844,53 +845,58 @@
         let isHost = false;
         let myPlayer = null;
         let opponentConnected = false;
+        let peerReady = false;
 
         function initPeer() {
+            updateConnectionStatus('initializing');
+            
             peer = new Peer({
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
                         {
                             urls: 'turn:openrelay.metered.ca:80',
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
-                        },
-                        {
-                            urls: 'turn:openrelay.metered.ca:443',
-                            username: 'openrelayproject',
-                            credential: 'openrelayproject'
-                        },
-                        {
-                            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                            username: 'openrelayproject',
-                            credential: 'openrelayproject'
                         }
                     ]
-                },
-                debug: 2
+                }
             });
             
             peer.on('open', (id) => {
                 myPeerId = id;
-                console.log('My peer ID:', id);
+                peerReady = true;
+                console.log('Peer ready:', id);
+                updateConnectionStatus('ready');
+                enableButtons();
             });
 
             peer.on('connection', (conn) => {
-                console.log('Incoming connection received');
+                console.log('Incoming connection');
                 connection = conn;
                 setupConnection();
             });
 
             peer.on('error', (err) => {
                 console.error('Peer error:', err);
-                alert('Connection error: ' + err.type);
+                if (err.type === 'peer-unavailable') {
+                    alert('Game ID not found. Please check and try again.');
+                } else {
+                    alert('Connection error: ' + err.type);
+                }
+                updateConnectionStatus('error');
             });
         }
 
+        function enableButtons() {
+            document.getElementById('createBtn').disabled = false;
+            document.getElementById('joinBtn').disabled = false;
+        }
+
         function createGame() {
-            if (!peer || !myPeerId) {
-                alert('Please wait, initializing connection...');
+            if (!peerReady) {
+                alert('Connection not ready yet. Please wait a moment.');
                 return;
             }
 
@@ -919,13 +925,15 @@
                 return;
             }
 
-            if (!peer) {
-                alert('Please wait, initializing connection...');
+            if (!peerReady) {
+                alert('Connection not ready yet. Please wait a moment.');
                 return;
             }
 
             isHost = false;
             myPlayer = 'B';
+            
+            updateConnectionStatus('connecting');
             
             connection = peer.connect(roomId, {
                 reliable: true
@@ -937,7 +945,6 @@
             document.getElementById('playerInfo').style.display = 'flex';
             document.getElementById('player1Name').textContent = 'Player 1 (Opponent)';
             document.getElementById('player2Name').textContent = 'Player 2 (You)';
-            updateConnectionStatus('waiting');
         }
 
         function setupConnection() {
@@ -946,7 +953,7 @@
             });
 
             connection.on('open', () => {
-                console.log('Connection opened');
+                console.log('Connection established');
                 opponentConnected = true;
                 gameActive = true;
                 updateConnectionStatus('connected');
@@ -963,6 +970,9 @@
                 } else {
                     sendMessage({ type: 'joinConfirm' });
                 }
+                
+                updateStatus();
+                updateActiveTeam();
             });
 
             connection.on('close', () => {
@@ -996,6 +1006,8 @@
                         scores: scores,
                         totalGames: totalGames
                     });
+                    updateStatus();
+                    updateActiveTeam();
                     break;
                 case 'move':
                     receiveMove(data.row, data.col);
@@ -1041,6 +1053,12 @@
                     updateActiveTeam();
                     updateColumnButtons();
                     break;
+                case 'resetScores':
+                    scores = data.scores;
+                    totalGames = data.totalGames;
+                    updateScoreDisplay();
+                    updateStats();
+                    break;
             }
         }
 
@@ -1082,7 +1100,7 @@
             navigator.clipboard.writeText(roomIdInput.value).then(() => {
                 const btn = event.target;
                 const originalText = btn.textContent;
-                btn.textContent = '✅ Copied!';
+                btn.textContent = 'Copied!';
                 setTimeout(() => {
                     btn.textContent = originalText;
                 }, 2000);
@@ -1093,23 +1111,48 @@
 
         function updateConnectionStatus(status) {
             const statusEl = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('status');
             
             switch(status) {
+                case 'initializing':
+                    statusEl.className = 'connection-status status-initializing';
+                    statusEl.innerHTML = '<span class="loading-spinner"></span>Initializing connection...';
+                    statusText.textContent = 'Initializing connection...';
+                    break;
+                case 'ready':
+                    statusEl.className = 'connection-status status-ready';
+                    statusEl.textContent = 'Ready - Create or Join a Game';
+                    statusText.textContent = 'Ready to play! Create or join a game';
+                    break;
+                case 'connecting':
+                    statusEl.className = 'connection-status status-initializing';
+                    statusEl.innerHTML = '<span class="loading-spinner"></span>Connecting...';
+                    statusText.textContent = 'Connecting to opponent...';
+                    break;
                 case 'waiting':
                     statusEl.className = 'connection-status status-waiting';
-                    statusEl.textContent = '⏳ Waiting for opponent...';
+                    statusEl.textContent = 'Waiting for opponent...';
+                    statusText.textContent = 'Waiting for opponent to join...';
                     break;
                 case 'connected':
                     statusEl.className = 'connection-status status-connected';
-                    statusEl.textContent = '✅ Connected - Game Ready!';
+                    statusEl.textContent = 'Connected - Game Ready!';
+                    updateStatus();
                     break;
                 case 'disconnected':
                     statusEl.className = 'connection-status status-disconnected';
-                    statusEl.textContent = '🔴 Disconnected';
+                    statusEl.textContent = 'Disconnected';
+                    statusText.textContent = 'Connection lost';
+                    break;
+                case 'error':
+                    statusEl.className = 'connection-status status-disconnected';
+                    statusEl.textContent = 'Connection Error';
+                    statusText.textContent = 'Connection error occurred';
                     break;
                 default:
                     statusEl.className = 'connection-status';
-                    statusEl.textContent = '🔴 Not Connected';
+                    statusEl.textContent = 'Not Connected';
+                    statusText.textContent = 'Not connected';
             }
         }
 
@@ -1168,6 +1211,7 @@
                 btn.id = `col-btn-${col}`;
                 indicators.appendChild(btn);
             }
+            updateColumnButtons();
         }
 
         function handleColumnClick(col) {
@@ -1290,10 +1334,10 @@
             
             historyEl.innerHTML = recentMoves.map(move => {
                 const teamClass = move.player === 'A' ? 'team-a-move' : 'team-b-move';
-                const emoji = move.player === 'A' ? '🟢' : '🟡';
+                const playerLabel = move.player === 'A' ? 'Player 1' : 'Player 2';
                 return `
                     <div class="history-item ${teamClass}">
-                        <span>${emoji} Player ${move.player === 'A' ? '1' : '2'}</span>
+                        <span>${playerLabel}</span>
                         <span>Col ${move.col + 1}</span>
                     </div>
                 `;
@@ -1333,7 +1377,7 @@
 
         function updateTimerDisplay() {
             const timerEl = document.getElementById('timerDisplay');
-            timerEl.textContent = `⏱️ Time: ${timeRemaining}s`;
+            timerEl.textContent = `Time: ${timeRemaining}s`;
             
             if (timeRemaining <= 10 && timerEnabled) {
                 timerEl.classList.add('timer-warning');
@@ -1342,7 +1386,7 @@
             }
             
             if (!timerEnabled) {
-                timerEl.textContent = '⏱️ Timer: OFF';
+                timerEl.textContent = 'Timer: OFF';
                 timerEl.classList.remove('timer-warning');
             }
         }
@@ -1361,7 +1405,7 @@
         function toggleTimer() {
             timerEnabled = !timerEnabled;
             const timerBtn = document.getElementById('timerBtn');
-            timerBtn.textContent = timerEnabled ? '⏱️ Timer: ON' : '⏱️ Timer: OFF';
+            timerBtn.textContent = timerEnabled ? 'Timer: ON' : 'Timer: OFF';
             resetTimer();
         }
 
@@ -1472,19 +1516,18 @@
             const statusEl = document.getElementById('status');
             statusEl.className = 'status-message win-message';
             const playerNum = currentPlayer === 'A' ? '1' : '2';
-            const emoji = currentPlayer === 'A' ? '🟢' : '🟡';
             
             if (currentPlayer === myPlayer) {
-                statusEl.textContent = `🎉 ${emoji} You WIN! 🎉`;
+                statusEl.textContent = `You WIN!`;
             } else {
-                statusEl.textContent = `${emoji} Player ${playerNum} WINS!`;
+                statusEl.textContent = `Player ${playerNum} WINS!`;
             }
         }
 
         function showDraw() {
             const statusEl = document.getElementById('status');
             statusEl.className = 'status-message draw-message';
-            statusEl.textContent = "🤝 It's a Draw! 🤝";
+            statusEl.textContent = "It's a Draw!";
         }
 
         function updateStatus() {
@@ -1497,12 +1540,11 @@
             }
             
             const playerNum = currentPlayer === 'A' ? '1' : '2';
-            const emoji = currentPlayer === 'A' ? '🟢' : '🟡';
             
             if (currentPlayer === myPlayer) {
-                statusEl.textContent = `${emoji} Your Turn`;
+                statusEl.textContent = `Your Turn`;
             } else {
-                statusEl.textContent = `${emoji} Player ${playerNum}'s Turn`;
+                statusEl.textContent = `Player ${playerNum}'s Turn`;
             }
         }
 
@@ -1547,10 +1589,23 @@
                 totalGames = 0;
                 updateScoreDisplay();
                 updateStats();
+                
+                if (opponentConnected) {
+                    sendMessage({ 
+                        type: 'resetScores',
+                        scores: scores,
+                        totalGames: totalGames
+                    });
+                }
+                
                 resetGame();
             }
         }
 
+        window.addEventListener('DOMContentLoaded', () => {
+            initPeer();
+            initBoard();
+        });
     </script>
 </body>
 </html>
