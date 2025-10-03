@@ -519,7 +519,6 @@
             border-left: 4px solid #ffc107;
         }
 
-        /* Desktop Layout */
         @media (min-width: 992px) {
             .game-container {
                 padding: 15px;
@@ -565,7 +564,6 @@
             }
         }
 
-        /* Tablet */
         @media (min-width: 768px) and (max-width: 991px) {
             .logo {
                 font-size: 1.9rem;
@@ -576,7 +574,6 @@
             }
         }
 
-        /* Mobile - Small */
         @media (max-width: 480px) {
             body {
                 padding: 5px;
@@ -668,7 +665,6 @@
             }
         }
 
-        /* Mobile - Extra Small */
         @media (max-width: 360px) {
             .logo {
                 font-size: 1.2rem;
@@ -685,7 +681,6 @@
             }
         }
 
-        /* Landscape Mobile */
         @media (max-height: 600px) and (orientation: landscape) {
             .board {
                 max-width: 500px;
@@ -778,7 +773,9 @@
                     <button class="btn btn-custom btn-reset" onclick="resetGame()">
                         🔄 New Game
                     </button>
-                   
+                    <button class="btn btn-custom btn-undo" id="undoBtn" onclick="undoMove()">
+                        ↩️ Undo
+                    </button>
                     <button class="btn btn-custom btn-timer" id="timerBtn" onclick="toggleTimer()">
                         ⏱️ Timer: ON
                     </button>
@@ -828,7 +825,6 @@
         const COLS = 7;
         const TURN_TIME = 30;
         
-        // Game State
         let board = [];
         let currentPlayer = 'A';
         let gameActive = false;
@@ -842,17 +838,38 @@
         let timeRemaining = TURN_TIME;
         let timerInterval = null;
 
-        // Multiplayer State
         let peer = null;
         let connection = null;
         let myPeerId = null;
         let isHost = false;
-        let myPlayer = null; // 'A' or 'B'
+        let myPlayer = null;
         let opponentConnected = false;
 
-        // Initialize PeerJS
         function initPeer() {
-            peer = new Peer();
+            peer = new Peer({
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' },
+                        {
+                            urls: 'turn:openrelay.metered.ca:80',
+                            username: 'openrelayproject',
+                            credential: 'openrelayproject'
+                        },
+                        {
+                            urls: 'turn:openrelay.metered.ca:443',
+                            username: 'openrelayproject',
+                            credential: 'openrelayproject'
+                        },
+                        {
+                            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                            username: 'openrelayproject',
+                            credential: 'openrelayproject'
+                        }
+                    ]
+                },
+                debug: 2
+            });
             
             peer.on('open', (id) => {
                 myPeerId = id;
@@ -866,7 +883,6 @@
                 updateConnectionStatus('connected');
                 document.getElementById('player2Name').textContent = 'Player 2 (Opponent)';
                 
-                // Host is always Player 1 (Green/A)
                 myPlayer = 'A';
                 gameActive = true;
                 initBoard();
@@ -932,7 +948,6 @@
                 gameActive = true;
                 initBoard();
                 
-                // Request current game state from host
                 sendMessage({ type: 'requestState' });
             });
         }
@@ -1503,10 +1518,8 @@
             }
         }
 
-        // Initialize on page load
         initPeer();
         initBoard();
     </script>
 </body>
-
 </html>
